@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Trash2, Mail, Copy, Check, FileSignature, ExternalLink, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Trash2, Mail, Copy, Check, FileSignature, ExternalLink, ClipboardList, XCircle } from 'lucide-react';
 import { DndContext, useDraggable, useDroppable, DragOverlay } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -55,6 +55,75 @@ const PageDroppable: React.FC<PageDroppableProps> = ({ pageNumber, children }) =
   );
 };
 
+// ── Draggable Placed Signature Field Overlay ───────────────────────────────────
+interface DraggablePlacedFieldProps {
+  field: SignatureField;
+  isSelected: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  onDelete: () => void;
+}
+
+const DraggablePlacedField: React.FC<DraggablePlacedFieldProps> = ({
+  field,
+  isSelected,
+  disabled,
+  onClick,
+  onDelete,
+}) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: field._id,
+    disabled: disabled,
+  });
+
+  const style = {
+    position: 'absolute' as const,
+    left: `${field.x * 100}%`,
+    top: `${field.y * 100}%`,
+    width: `${field.width * 100}%`,
+    height: `${field.height * 100}%`,
+    zIndex: 20,
+    transform: transform
+      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+      : undefined,
+    cursor: disabled ? 'default' : isDragging ? 'grabbing' : 'grab',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`absolute border-2 border-dashed rounded flex flex-col items-center justify-center select-none p-1 group touch-none ${
+        isSelected
+          ? 'border-blue-600 bg-blue-50/40 ring-2 ring-blue-300'
+          : 'border-blue-400 bg-blue-50/20 hover:border-blue-600 hover:bg-blue-50/30'
+      } ${isDragging ? 'opacity-30' : ''}`}
+    >
+      <FileSignature className="h-4 w-4 text-blue-600" />
+      <span className="text-[10px] font-semibold text-blue-700 mt-0.5 truncate max-w-full">
+        {field.signerEmail ? field.signerEmail.split('@')[0] : 'Sign Here'}
+      </span>
+      {!disabled && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-30 cursor-pointer"
+        >
+          <XCircle className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+};
+
 // ── Document Studio Page Component ──────────────────────────────────────────
 export const DocumentStudio: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,6 +133,7 @@ export const DocumentStudio: React.FC = () => {
   const [fields, setFields] = useState<SignatureField[]>([]);
   const [selectedField, setSelectedField] = useState<SignatureField | null>(null);
   const [numPages, setNumPages] = useState<number>(0);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sharing, setSharing] = useState(false);
   const [signingLinks, setSigningLinks] = useState<{ email: string; link: string }[]>([]);
@@ -122,8 +192,13 @@ export const DocumentStudio: React.FC = () => {
   };
 
   // Drag and drop drop handler
+  const handleDragStart = (event: any) => {
+    setActiveId(event.active.id);
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { over, delta } = event;
+    const { active, over, delta } = event;
+    setActiveId(null);
     if (!over || !documentItem) return;
 
     const pageNumber = over.data.current?.pageNumber as number;
@@ -134,35 +209,80 @@ export const DocumentStudio: React.FC = () => {
     const mouseEvent = event.activatorEvent as MouseEvent;
     if (!mouseEvent) return;
 
-    // drop position = initial client position + delta
-    const dropX = mouseEvent.clientX + delta.x;
-    const dropY = mouseEvent.clientY + delta.y;
+    if (active.id === 'palette-signature-field') {
+      // 1. Placing a NEW signature field
+      const dropX = mouseEvent.clientX + delta.x;
+      const dropY = mouseEvent.clientY + delta.y;
 
-    // Convert client position to relative coordinates inside the page element
-    const x = (dropX - rect.left) / rect.width;
-    const y = (dropY - rect.top) / rect.height;
+      const x = (dropX - rect.left) / rect.width;
+      const y = (dropY - rect.top) / rect.height;
 
-    // Normalize coordinates to 0-1
-    const normalisedX = Math.max(0, Math.min(1 - 0.25, x)); // Prevent overflowing width (0.25 width)
-    const normalisedY = Math.max(0, Math.min(1 - 0.07, y)); // Prevent overflowing height (0.07 height)
+      const normalisedX = Math.max(0, Math.min(1 - 0.25, x));
+      const normalisedY = Math.max(0, Math.min(1 - 0.06, y));
 
-    // Call API to create field
-    const payload = {
-      page: pageNumber,
-      x: normalisedX,
-      y: normalisedY,
-      width: 0.25, // default 25% of page width
-      height: 0.06, // default 6% of page height
-      signerEmail: '', // initially blank, assigned by creator
-    };
+      const payload = {
+        page: pageNumber,
+        x: normalisedX,
+        y: normalisedY,
+        width: 0.25,
+        height: 0.06,
+        signerEmail: '',
+      };
 
-    try {
-      const { data } = await api.post(`/docs/${id}/fields`, payload);
-      setFields((prev) => [...prev, data.field]);
-      setSelectedField(data.field);
-      setSignerEmailInput('');
-    } catch (err) {
-      console.error('Failed to place signature field:', err);
+      try {
+        const { data } = await api.post(`/docs/${id}/fields`, payload);
+        setFields((prev) => [...prev, data.field]);
+        setSelectedField(data.field);
+        setSignerEmailInput('');
+      } catch (err) {
+        console.error('Failed to place signature field:', err);
+      }
+    } else {
+      // 2. Repositioning an EXISTING field
+      const fieldId = active.id as string;
+      const existingField = fields.find((f) => f._id === fieldId);
+      if (!existingField) return;
+
+      const initialPageElement = document.getElementById(`page-container-${existingField.page}`);
+      if (!initialPageElement) return;
+
+      const initialRect = initialPageElement.getBoundingClientRect();
+      const startX = initialRect.left + existingField.x * initialRect.width;
+      const startY = initialRect.top + existingField.y * initialRect.height;
+
+      const dropX = startX + delta.x;
+      const dropY = startY + delta.y;
+
+      const x = (dropX - rect.left) / rect.width;
+      const y = (dropY - rect.top) / rect.height;
+
+      const normalisedX = Math.max(0, Math.min(1 - existingField.width, x));
+      const normalisedY = Math.max(0, Math.min(1 - existingField.height, y));
+
+      // Optimistically update the UI position immediately
+      setFields((prev) =>
+        prev.map((f) =>
+          f._id === fieldId
+            ? { ...f, page: pageNumber, x: normalisedX, y: normalisedY }
+            : f
+        )
+      );
+
+      try {
+        const { data } = await api.patch(`/docs/${id}/fields/${fieldId}`, {
+          page: pageNumber,
+          x: normalisedX,
+          y: normalisedY,
+        });
+        // Sync selected field if it was the one dragged
+        if (selectedField?._id === fieldId) {
+          setSelectedField(data.field);
+        }
+      } catch (err) {
+        console.error('Failed to update field position:', err);
+        // Rollback on error
+        fetchDocumentData();
+      }
     }
   };
 
@@ -243,7 +363,7 @@ export const DocumentStudio: React.FC = () => {
   if (!documentItem) return null;
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="min-h-screen flex flex-col bg-gray-100">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-40 shadow-sm">
@@ -362,38 +482,16 @@ export const DocumentStudio: React.FC = () => {
                         className="rounded-lg shadow-sm"
                       />
                       {/* Render fields over page */}
-                      {pageFields.map((f) => {
-                        const style = {
-                          position: 'absolute' as const,
-                          left: `${f.x * 100}%`,
-                          top: `${f.y * 100}%`,
-                          width: `${f.width * 100}%`,
-                          height: `${f.height * 100}%`,
-                          zIndex: 20, // Ensure placed fields render above canvas/text/annotation layers
-                        };
-                        const isSelected = selectedField?._id === f._id;
-
-                        return (
-                          <div
-                            key={f._id}
-                            style={style}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSelectField(f);
-                            }}
-                            className={`absolute border-2 border-dashed rounded flex flex-col items-center justify-center cursor-pointer select-none transition-all p-1 ${
-                              isSelected
-                                ? 'border-blue-600 bg-blue-50/40 ring-2 ring-blue-300'
-                                : 'border-blue-400 bg-blue-50/20 hover:border-blue-600 hover:bg-blue-50/30'
-                            }`}
-                          >
-                            <FileSignature className="h-4 w-4 text-blue-600" />
-                            <span className="text-[10px] font-semibold text-blue-700 mt-0.5 truncate max-w-full">
-                              {f.signerEmail ? f.signerEmail.split('@')[0] : 'Sign Here'}
-                            </span>
-                          </div>
-                        );
-                      })}
+                      {pageFields.map((f) => (
+                        <DraggablePlacedField
+                          key={f._id}
+                          field={f}
+                          isSelected={selectedField?._id === f._id}
+                          disabled={documentItem.status !== 'draft' && documentItem.status !== 'pending'}
+                          onClick={() => handleSelectField(f)}
+                          onDelete={() => handleDeleteField(f._id)}
+                        />
+                      ))}
                     </PageDroppable>
                   );
                 })}
@@ -600,10 +698,21 @@ export const DocumentStudio: React.FC = () => {
 
       {/* Drag overlay to ensure dragging element is painted on top of everything without boundary clipping */}
       <DragOverlay dropAnimation={null}>
-        <div className="p-4 border-2 border-dashed rounded-xl bg-blue-100 border-blue-500 text-blue-800 font-semibold flex items-center justify-center gap-2 shadow-lg opacity-95 cursor-grabbing z-[100]">
-          <FileSignature className="h-5 w-5 flex-shrink-0" />
-          <span>Signature Field</span>
-        </div>
+        {activeId === 'palette-signature-field' ? (
+          <div className="p-4 border-2 border-dashed rounded-xl bg-blue-100 border-blue-500 text-blue-800 font-semibold flex items-center justify-center gap-2 shadow-lg opacity-95 cursor-grabbing z-[100]">
+            <FileSignature className="h-5 w-5 flex-shrink-0" />
+            <span>Signature Field</span>
+          </div>
+        ) : activeId ? (
+          <div className="border-2 border-dashed border-blue-600 bg-blue-100/80 rounded flex flex-col items-center justify-center p-1 text-blue-800 font-semibold shadow-lg opacity-95 cursor-grabbing z-[100] w-[150px] h-[36px]">
+            <FileSignature className="h-4 w-4 text-blue-600" />
+            <span className="text-[10px] font-semibold text-blue-700 mt-0.5 truncate max-w-full">
+              {fields.find((f) => f._id === activeId)?.signerEmail
+                ? fields.find((f) => f._id === activeId)?.signerEmail.split('@')[0]
+                : 'Sign Here'}
+            </span>
+          </div>
+        ) : null}
       </DragOverlay>
     </DndContext>
   );
