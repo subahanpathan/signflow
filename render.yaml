@@ -1,0 +1,41 @@
+# Render Infrastructure Blueprint
+# This file auto-configures your backend service when you connect the repo to Render.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: signflow-backend
+    runtime: node
+    region: oregon   # change to: frankfurt, ohio, singapore as preferred
+    plan: free       # upgrade to starter ($7/mo) to avoid cold starts
+
+    # ── Build ──────────────────────────────────────────────────────────────────
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start          # runs: node dist/index.js
+
+    # ── Health check ──────────────────────────────────────────────────────────
+    healthCheckPath: /health
+
+    # ── Environment Variables ─────────────────────────────────────────────────
+    # Set these in the Render Dashboard → Environment tab.
+    # DO NOT hardcode real secrets here — this file is committed to git.
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000         # Render injects $PORT automatically; this is the default
+
+      # ── Secrets (set manually in Render Dashboard) ──────────────────────────
+      - key: MONGODB_URI
+        sync: false          # Render will prompt you to fill this in
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false          # e.g. https://signflow.vercel.app
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
