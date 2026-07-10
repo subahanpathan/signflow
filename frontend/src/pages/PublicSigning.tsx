@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { FileSignature, CheckCircle, XCircle, PenTool, Type, Trash2, ArrowRight, AlertTriangle } from 'lucide-react';
+import { FileSignature, CheckCircle, XCircle, PenTool, Type, Trash2, ArrowRight, AlertTriangle, Upload, ImageIcon } from 'lucide-react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import api from '../lib/axios';
 import type { SignatureField, DocumentItem } from '../types';
@@ -26,9 +26,33 @@ export const PublicSigning: React.FC = () => {
   const [rejected, setRejected] = useState(false);
 
   // Signature modal state
-  const [signMethod, setSignMethod] = useState<'draw' | 'type'>('draw');
+  const [signMethod, setSignMethod] = useState<'draw' | 'type' | 'upload'>('draw');
   const [typedName, setTypedName] = useState('');
   const [isSubmittingSig, setIsSubmittingSig] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+      alert('Only PNG, JPG, or JPEG images are allowed.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB.');
+      return;
+    }
+
+    setUploadedFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUploadedImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Canvas drawing state
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -141,13 +165,16 @@ export const PublicSigning: React.FC = () => {
 
     try {
       setIsSubmittingSig(true);
-      let dataUrl = '';
+      let file: File | null = null;
 
       if (signMethod === 'draw') {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        dataUrl = canvas.toDataURL('image/png');
-      } else {
+        const dataUrl = canvas.toDataURL('image/png');
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        file = new File([blob], 'signature.png', { type: 'image/png' });
+      } else if (signMethod === 'type') {
         if (!typedName.trim()) {
           alert('Please type your name to sign.');
           return;
@@ -171,13 +198,19 @@ export const PublicSigning: React.FC = () => {
         ctx.textBaseline = 'middle';
         ctx.fillText(typedName.trim(), canvas.width / 2, canvas.height / 2);
 
-        dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = canvas.toDataURL('image/png');
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        file = new File([blob], 'signature.png', { type: 'image/png' });
+      } else if (signMethod === 'upload') {
+        if (!uploadedFile) {
+          alert('Please upload or select an image to sign.');
+          return;
+        }
+        file = uploadedFile;
       }
 
-      // Convert dataURL to Blob
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
-      const file = new File([blob], 'signature.png', { type: 'image/png' });
+      if (!file) return;
 
       const formData = new FormData();
       formData.append('signature', file);
@@ -194,6 +227,8 @@ export const PublicSigning: React.FC = () => {
       // Close modal
       setSigningField(null);
       setTypedName('');
+      setUploadedImage(null);
+      setUploadedFile(null);
     } catch (err) {
       console.error('Failed to submit signature:', err);
       alert('Failed to save signature. Please try again.');
@@ -456,6 +491,17 @@ export const PublicSigning: React.FC = () => {
                 <Type className="h-4 w-4" />
                 Type Signature
               </button>
+              <button
+                onClick={() => setSignMethod('upload')}
+                className={`flex-1 py-4 text-sm font-semibold flex items-center justify-center gap-2 border-b-2 transition-colors ${
+                  signMethod === 'upload'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Upload className="h-4 w-4" />
+                Upload Image
+              </button>
             </div>
 
             {/* Modal Body */}
@@ -488,7 +534,7 @@ export const PublicSigning: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : signMethod === 'type' ? (
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
@@ -512,6 +558,52 @@ export const PublicSigning: React.FC = () => {
                     )}
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-400 italic">Upload an image file of your signature (PNG, JPG or JPEG):</p>
+                  <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors rounded-xl p-6 bg-gray-50 cursor-pointer relative group">
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg, image/jpg"
+                      onChange={handleImageChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    {uploadedImage ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <img
+                          src={uploadedImage}
+                          alt="Signature Preview"
+                          className="max-h-[120px] object-contain border border-gray-200 bg-white p-1 rounded shadow-sm"
+                        />
+                        <span className="text-xs text-gray-500 font-medium truncate max-w-[200px]">
+                          {uploadedFile?.name}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="h-10 w-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <ImageIcon className="h-5 w-5" />
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700">Click or drag image file here</span>
+                        <span className="text-[10px] text-gray-400">PNG, JPG or JPEG up to 5MB</span>
+                      </div>
+                    )}
+                  </div>
+                  {uploadedImage && (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => {
+                          setUploadedImage(null);
+                          setUploadedFile(null);
+                        }}
+                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remove Image
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -521,6 +613,8 @@ export const PublicSigning: React.FC = () => {
                 onClick={() => {
                   setSigningField(null);
                   setTypedName('');
+                  setUploadedImage(null);
+                  setUploadedFile(null);
                 }}
                 disabled={isSubmittingSig}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
