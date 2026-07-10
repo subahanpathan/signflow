@@ -1,15 +1,15 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { connectDB } from './config/db';
 import authRoutes from './routes/auth.routes';
 import documentRoutes from './routes/document.routes';
 import publicRoutes from './routes/public.routes';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
