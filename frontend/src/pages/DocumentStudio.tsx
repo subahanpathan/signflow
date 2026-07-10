@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Trash2, Mail, Copy, Check, FileSignature, ExternalLink, ClipboardList } from 'lucide-react';
-import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, DragOverlay } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { Document, Page, pdfjs } from 'react-pdf';
 import api from '../lib/axios';
@@ -11,25 +11,17 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.m
 
 // ── Draggable Sidebar Item ───────────────────────────────────────────────────
 const DraggableFieldButton: React.FC = () => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: 'palette-signature-field',
   });
-
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: 50,
-      }
-    : undefined;
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...listeners}
       {...attributes}
       className={`p-4 border-2 border-dashed rounded-xl bg-blue-50/50 border-blue-300 hover:border-blue-500 hover:bg-blue-50 text-blue-700 font-medium cursor-grab active:cursor-grabbing flex items-center justify-center gap-2 transition-all ${
-        isDragging ? 'opacity-50 ring-2 ring-blue-500' : ''
+        isDragging ? 'opacity-30 border-blue-200 bg-gray-50 text-blue-400 select-none' : ''
       }`}
     >
       <FileSignature className="h-5 w-5 flex-shrink-0" />
@@ -377,6 +369,7 @@ export const DocumentStudio: React.FC = () => {
                           top: `${f.y * 100}%`,
                           width: `${f.width * 100}%`,
                           height: `${f.height * 100}%`,
+                          zIndex: 20, // Ensure placed fields render above canvas/text/annotation layers
                         };
                         const isSelected = selectedField?._id === f._id;
 
@@ -604,6 +597,14 @@ export const DocumentStudio: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Drag overlay to ensure dragging element is painted on top of everything without boundary clipping */}
+      <DragOverlay dropAnimation={null}>
+        <div className="p-4 border-2 border-dashed rounded-xl bg-blue-100 border-blue-500 text-blue-800 font-semibold flex items-center justify-center gap-2 shadow-lg opacity-95 cursor-grabbing z-[100]">
+          <FileSignature className="h-5 w-5 flex-shrink-0" />
+          <span>Signature Field</span>
+        </div>
+      </DragOverlay>
     </DndContext>
   );
 };

@@ -415,6 +415,7 @@ export const PublicSigning: React.FC = () => {
                       top: `${f.y * 100}%`,
                       width: `${f.width * 100}%`,
                       height: `${f.height * 100}%`,
+                      zIndex: 20, // Ensure fields overlay above the PDF canvas
                     };
 
                     if (isSigned) {
