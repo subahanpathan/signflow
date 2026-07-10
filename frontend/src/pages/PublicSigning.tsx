@@ -5,7 +5,7 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import api from '../lib/axios';
 import type { SignatureField, DocumentItem } from '../types';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 
 export const PublicSigning: React.FC = () => {
   const { token } = useParams<{ token: string }>();
