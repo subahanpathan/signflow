@@ -21,8 +21,6 @@ const signingTokenSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-// Add index on token for fast lookups
-signingTokenSchema.index({ token: 1 });
 
 export const SigningToken = mongoose.model<ISigningToken>(
   'SigningToken',
