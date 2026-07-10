@@ -22,7 +22,7 @@ const signatureFieldSchema: Schema = new Schema(
     y:           { type: Number, required: true, min: 0, max: 1 },
     width:       { type: Number, required: true, min: 0, max: 1 },
     height:      { type: Number, required: true, min: 0, max: 1 },
-    signerEmail: { type: String, required: true, lowercase: true, trim: true },
+    signerEmail: { type: String, default: '', lowercase: true, trim: true },
     status:      { type: String, enum: ['unsigned', 'signed'], default: 'unsigned' },
     signatureImageUrl: { type: String, default: null },
     signedAt:    { type: Date, default: null },
