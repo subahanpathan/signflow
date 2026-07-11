@@ -3,15 +3,27 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { SignatureField } from '../models/SignatureField';
 import { DocModel } from '../models/Document';
 import { supabase } from '../lib/supabase';
+import { asyncHandler } from '../middleware/asyncHandler.middleware';
 import multer from 'multer';
 
-const upload = multer(); // memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed for signatures'));
+    }
+  },
+});
 
 // ── POST /api/docs/:id/fields/:fieldId/sign ─────────────────────────────────────
 export const signField = [
   upload.single('signature'),
-  async (req: AuthRequest, res: Response): Promise<void> => {
-    try {
+  asyncHandler(
+    async (req: AuthRequest, res: Response): Promise<void> => {
+      try {
       const userId = (req.user!._id as any).toString();
       const { id: docId, fieldId } = req.params;
 
@@ -52,7 +64,7 @@ export const signField = [
       console.error('Sign field error:', error);
       res.status(500).json({ message: 'Internal server error' });
     }
-  },
+  })
 ];
 
 // ── POST /api/docs/:id/sign (finalize document) ───────────────────────────────────

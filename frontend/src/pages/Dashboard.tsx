@@ -18,14 +18,17 @@ export const Dashboard: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
+  const [error, setError] = useState('');
 
   const fetchDocuments = useCallback(async () => {
     try {
       setLoading(true);
+      setError('');
       const { data } = await api.get('/docs');
       setDocuments(data.documents);
     } catch (err) {
       console.error('Failed to fetch documents:', err);
+      setError('Could not load documents. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -38,10 +41,12 @@ export const Dashboard: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this document?')) return;
     try {
+      setError('');
       await api.delete(`/docs/${id}`);
       setDocuments((prev) => prev.filter((d) => d._id !== id));
     } catch (err) {
       console.error('Failed to delete document:', err);
+      setError('Could not delete the document. Please try again.');
     }
   };
 
@@ -93,6 +98,14 @@ export const Dashboard: React.FC = () => {
 
         {/* Document list card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-2">
+          {error && (
+            <div className="mb-4 rounded-md bg-red-50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-red-800">{error}</p>
+                <button onClick={() => setError('')} className="text-red-600 hover:text-red-800 text-sm font-medium">Dismiss</button>
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />

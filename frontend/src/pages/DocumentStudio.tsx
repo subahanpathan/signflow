@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Trash2, Mail, Copy, Check, FileSignature, ExternalLink, ClipboardList, XCircle } from 'lucide-react';
+import { ArrowLeft, Trash2, Mail, Copy, Check, FileSignature, ExternalLink, ClipboardList, XCircle, Download } from 'lucide-react';
 import { DndContext, useDraggable, useDroppable, DragOverlay } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -138,6 +138,7 @@ export const DocumentStudio: React.FC = () => {
   const [sharing, setSharing] = useState(false);
   const [signingLinks, setSigningLinks] = useState<{ email: string; link: string }[]>([]);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   // Signer email edit state
   const [signerEmailInput, setSignerEmailInput] = useState('');
@@ -346,6 +347,22 @@ export const DocumentStudio: React.FC = () => {
     }
   };
 
+  const handleDownloadSigned = async () => {
+    if (!id || !documentItem) return;
+    try {
+      setDownloading(true);
+      const { data } = await api.get<{ downloadUrl: string }>(`/docs/${id}/download`);
+      if (data.downloadUrl) {
+        window.open(data.downloadUrl, '_blank');
+      }
+    } catch (err: any) {
+      console.error('Failed to download signed PDF:', err);
+      alert(err.response?.data?.message || 'Could not download signed PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const copyToClipboard = (link: string) => {
     navigator.clipboard.writeText(link);
     setCopiedLink(link);
@@ -390,6 +407,16 @@ export const DocumentStudio: React.FC = () => {
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg text-sm shadow-sm transition-colors"
               >
                 {sharing ? 'Publishing...' : 'Publish & Share'}
+              </button>
+            ) : null}
+            {documentItem.status === 'signed' ? (
+              <button
+                onClick={handleDownloadSigned}
+                disabled={downloading}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg text-sm shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <Download className="h-4 w-4" />
+                {downloading ? 'Preparing...' : 'Download Signed PDF'}
               </button>
             ) : null}
           </div>

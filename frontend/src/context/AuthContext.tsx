@@ -28,9 +28,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const { data } = await api.get('/auth/me');
           setUser(data.user);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Auth check failed:', error);
-        setAuthToken(null);
+        if (error.response?.status === 401) {
+          setAuthToken(null);
+        }
       } finally {
         setLoading(false);
       }

@@ -210,8 +210,11 @@ export const finalizeDocumentPublic = async (req: Request, res: Response): Promi
       const sigArrayBuffer = await sigData.arrayBuffer();
       const sigImageBytes = Buffer.from(sigArrayBuffer);
 
-      // Embed signature image (PNG format)
-      const sigImage = await pdfDoc.embedPng(sigImageBytes);
+      const ext = field.signatureImageUrl.split('.').pop()?.toLowerCase();
+      const sigImage =
+        ext === 'jpg' || ext === 'jpeg'
+          ? await pdfDoc.embedJpg(sigImageBytes)
+          : await pdfDoc.embedPng(sigImageBytes);
 
       // Get page dimensions
       const pageIndex = field.page - 1; // 1-indexed to 0-indexed
@@ -308,6 +311,62 @@ export const rejectDocumentPublic = async (req: Request, res: Response): Promise
     res.json({ success: true, document });
   } catch (error) {
     console.error('Reject document public error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// ── GET /api/public/sign/:token/download ────────────────────────────────────────
+export const downloadDocumentPublic = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params;
+    const tokenObj = await SigningToken.findOne({ token: token as string });
+
+    if (!tokenObj) {
+      res.status(404).json({ message: 'Signing token not found' });
+      return;
+    }
+
+    const document = await DocModel.findById(tokenObj.documentId);
+    if (!document) {
+      res.status(404).json({ message: 'Document not found' });
+      return;
+    }
+
+    if (document.status !== 'signed') {
+      res.status(400).json({ message: 'Document has not been finalized yet' });
+      return;
+    }
+
+    // If token has been used, enforce a 48-hour download window
+    if (tokenObj.usedAt) {
+      const hoursSinceUsed = (Date.now() - tokenObj.usedAt.getTime()) / (1000 * 60 * 60);
+      if (hoursSinceUsed > 48) {
+        res.status(403).json({
+          message: 'Download window has expired. Please contact the document owner for a copy.',
+        });
+        return;
+      }
+    }
+
+    const filePath = document.signedFileUrl || document.originalFileUrl;
+    if (!filePath) {
+      res.status(500).json({ message: 'No file available for download' });
+      return;
+    }
+
+    const { data, error } = await supabase.storage
+      .from(BUCKET_DOCS)
+      .createSignedUrl(filePath, 60 * 5); // 5 minute expiry
+
+    if (error) {
+      console.error('Supabase signed URL error:', error);
+      res.status(500).json({ message: 'Could not generate download URL' });
+      return;
+    }
+
+    res.json({ downloadUrl: data.signedUrl });
+  } catch (error) {
+    console.error('Download document public error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

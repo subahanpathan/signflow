@@ -66,9 +66,11 @@ export const PublicSigning: React.FC = () => {
       setDocumentItem(data.document);
       setFields(data.fields);
       setSignerEmail(data.signerEmail);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch public signing details:', err);
-      // Wait, if it fails, maybe showing a message is enough
+      if (!err.response) {
+        alert('Server unreachable. Please check your connection and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -244,9 +246,13 @@ export const PublicSigning: React.FC = () => {
       setIsFinalizing(true);
       await api.post(`/public/sign/${token}/finalize`);
       setFinalized(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to finalize document:', err);
-      alert('Could not finalize document. Ensure all signature fields have been signed.');
+      if (!err.response) {
+        alert('Server unreachable. Please check your connection and try again.');
+      } else {
+        alert('Could not finalize document. Ensure all signature fields have been signed.');
+      }
     } finally {
       setIsFinalizing(false);
     }
@@ -260,9 +266,13 @@ export const PublicSigning: React.FC = () => {
       await api.post(`/public/sign/${token}/reject`, { reason: rejectReason.trim() || 'No reason provided' });
       setRejected(true);
       setShowRejectModal(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to reject document:', err);
-      alert('Could not reject the document. Please try again.');
+      if (!err.response) {
+        alert('Server unreachable. Please check your connection and try again.');
+      } else {
+        alert('Could not reject the document. Please try again.');
+      }
     } finally {
       setIsRejecting(false);
     }

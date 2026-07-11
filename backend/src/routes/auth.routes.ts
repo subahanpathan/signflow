@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { asyncHandler } from '../middleware/asyncHandler.middleware';
 import {
   register,
   login,
@@ -23,10 +24,10 @@ const authLimiter = rateLimit({
   message: { message: 'Too many authentication attempts. Please try again in 15 minutes.' },
 });
 
-router.post('/register', authLimiter, validate(registerSchema), register);
-router.post('/login', authLimiter, validate(loginSchema), login);
-router.post('/refresh', refresh);
-router.post('/logout', logout);
-router.get('/me', requireAuth, me);
+router.post('/register', authLimiter, validate(registerSchema), asyncHandler(register));
+router.post('/login', authLimiter, validate(loginSchema), asyncHandler(login));
+router.post('/refresh', asyncHandler(refresh));
+router.post('/logout', asyncHandler(logout));
+router.get('/me', requireAuth, asyncHandler(me));
 
 export default router;

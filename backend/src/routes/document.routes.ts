@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth.middleware';
+import { asyncHandler } from '../middleware/asyncHandler.middleware';
 import {
   uploadDocument,
   listDocuments,
@@ -8,6 +9,7 @@ import {
   deleteDocument,
   shareDocument,
   getAuditLogs,
+  downloadDocument,
 } from '../controllers/document.controller';
 import fieldRoutes from './field.routes';
 
@@ -26,12 +28,13 @@ const upload = multer({
   },
 });
 
-router.post('/upload', requireAuth, upload.single('pdf'), uploadDocument);
-router.get('/', requireAuth, listDocuments);
-router.get('/:id', requireAuth, getDocument);
-router.delete('/:id', requireAuth, deleteDocument);
-router.post('/:id/share', requireAuth, shareDocument);
-router.get('/:id/audit', requireAuth, getAuditLogs);
+router.post('/upload', requireAuth, upload.single('pdf'), asyncHandler(uploadDocument));
+router.get('/', requireAuth, asyncHandler(listDocuments));
+router.get('/:id', requireAuth, asyncHandler(getDocument));
+router.get('/:id/download', requireAuth, asyncHandler(downloadDocument));
+router.delete('/:id', requireAuth, asyncHandler(deleteDocument));
+router.post('/:id/share', requireAuth, asyncHandler(shareDocument));
+router.get('/:id/audit', requireAuth, asyncHandler(getAuditLogs));
 
 // Nested field routes: /api/docs/:id/fields
 router.use('/:id/fields', fieldRoutes);

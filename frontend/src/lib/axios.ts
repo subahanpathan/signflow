@@ -9,7 +9,19 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+
+    // Do not intercept errors on public signing routes — they never use the
+    // owner's JWT, so a 401/network failure here must not clear the session.
+    if (originalRequest?.url?.startsWith('/public/sign/')) {
+      return Promise.reject(error);
+    }
+
+    // Network / CORS failure (no response received) — do not log user out
+    if (!error.response) {
+      return Promise.reject(error);
+    }
+
+    if (error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
         const { data } = await axios.post(
@@ -21,7 +33,6 @@ api.interceptors.response.use(
         originalRequest.headers['Authorization'] = `Bearer ${data.accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // If refresh fails, clear auth state
         localStorage.removeItem('token');
         window.location.href = '/login';
         return Promise.reject(refreshError);

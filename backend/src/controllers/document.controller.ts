@@ -14,6 +14,10 @@ const BUCKET = 'documents';
 
 // ── Upload a PDF ──────────────────────────────────────────────────────────────
 export const uploadDocument = async (req: AuthRequest, res: Response): Promise<void> => {
+  // Declared in the outer scope so the catch block can clean up an orphaned
+  // Supabase object if the DB write fails after a successful upload.
+  let storagePath: string | null = null;
+
   try {
     if (!req.file) {
       res.status(400).json({ message: 'No PDF file uploaded' });
@@ -34,7 +38,7 @@ export const uploadDocument = async (req: AuthRequest, res: Response): Promise<v
     }
 
     const title = req.body.title?.trim() || req.file.originalname.replace(/\.pdf$/i, '');
-    const storagePath = `${userId}/${Date.now()}_${req.file.originalname}`;
+    storagePath = `${userId}/${Date.now()}_${req.file.originalname}`;
 
     // Upload to Supabase private bucket
     const { error: uploadError } = await supabase.storage
@@ -67,7 +71,20 @@ export const uploadDocument = async (req: AuthRequest, res: Response): Promise<v
     res.status(201).json({ document });
   } catch (error) {
     console.error('Upload document error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+
+    // Best-effort cleanup: if we uploaded to Supabase but the DB write failed,
+    // remove the orphaned object so it doesn't linger in a broken state.
+    if (storagePath) {
+      try {
+        await supabase.storage.from(BUCKET).remove([storagePath]);
+      } catch (cleanupError) {
+        console.error('Failed to clean up orphaned upload:', cleanupError);
+      }
+    }
+
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Internal server error' });
+    }
   }
 };
 
@@ -256,6 +273,50 @@ export const getAuditLogs = async (req: AuthRequest, res: Response): Promise<voi
     res.json({ logs });
   } catch (error) {
     console.error('Get audit logs error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// ── GET /api/docs/:id/download ─────────────────────────────────────────────────
+export const downloadDocument = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const documentId = req.params.id;
+    const userId = (req.user!._id as any).toString();
+
+    const document = await DocModel.findById(documentId);
+    if (!document) {
+      res.status(404).json({ message: 'Document not found' });
+      return;
+    }
+
+    if (document.ownerId.toString() !== userId) {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    if (document.status !== 'signed') {
+      res.status(400).json({ message: 'Document is not signed yet' });
+      return;
+    }
+
+    if (!document.signedFileUrl) {
+      res.status(400).json({ message: 'No signed file available for download' });
+      return;
+    }
+
+    const { data, error } = await supabase.storage
+      .from(BUCKET)
+      .createSignedUrl(document.signedFileUrl, 60 * 5); // 5 minute expiry
+
+    if (error) {
+      console.error('Signed URL error:', error);
+      res.status(500).json({ message: 'Could not generate download URL' });
+      return;
+    }
+
+    res.json({ downloadUrl: data.signedUrl });
+  } catch (error) {
+    console.error('Download document error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
