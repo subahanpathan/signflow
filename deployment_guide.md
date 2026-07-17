@@ -45,7 +45,7 @@ Render will host the Node.js Express server. Since we committed a `render.yaml` 
 | `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase Service Role Key (needed for secure backend bucket access) |
 | `NODE_ENV` | Set to `production` |
 
-*Note: Once deployed, Render will provide a live service URL, e.g. `https://signflow-backend.onrender.com`. Copy this URL for the frontend setup.*
+*Note: Once deployed, Render will provide a live service URL. The current live backend is at `https://signflow-x49g.onrender.com`.*
 
 ---
 
@@ -62,10 +62,10 @@ Vercel will host the React frontend. Vercel automatically detects Vite apps and 
    - **Root Directory:** `frontend`
 5. Expand **Environment Variables** and add the following variable:
    - **Key:** `VITE_API_URL`
-   - **Value:** `https://your-backend-domain.onrender.com/api` (the Render live backend API URL)
+   - **Value:** `https://signflow-x49g.onrender.com/api` (live Render backend URL)
 6. Click **Deploy**.
 
-Vercel will build the frontend, apply the client-side SPA routing rules defined in `frontend/vercel.json`, and output a live public URL (e.g. `https://signflow.vercel.app`).
+Vercel will build the frontend, apply the client-side SPA routing rules defined in `frontend/vercel.json`, and output a live public URL: **`https://signflow-ten-phi.vercel.app`**.
 
 ---
 
@@ -74,7 +74,7 @@ Vercel will build the frontend, apply the client-side SPA routing rules defined 
 Once both frontend and backend are live:
 1. Go to your **Render Dashboard** → select your backend service.
 2. Go to **Environment**.
-3. Update the `FRONTEND_URL` variable to match your live Vercel URL exactly (e.g. `https://signflow.vercel.app` - no trailing slash).
+3. Update the `FRONTEND_URL` variable to `https://signflow-ten-phi.vercel.app` (no trailing slash).
 4. Save changes. Render will automatically trigger a re-deploy with the new CORS settings.
 
 ---
@@ -82,6 +82,7 @@ Once both frontend and backend are live:
 ## Verification
 
 To verify your live deployment:
-- Access your Vercel URL (`https://your-app.vercel.app/`).
+- Access the live frontend at **https://signflow-ten-phi.vercel.app**.
+- The backend API is live at **https://signflow-x49g.onrender.com**.
 - Sign up and log in.
 - Try uploading a PDF, placing a signature field, sharing the signing link, signing the document via the public link, and checking the audit trail to confirm that everything is connected.
