@@ -21,6 +21,8 @@ services:
     # Set these in the Render Dashboard → Environment tab.
     # DO NOT hardcode real secrets here — this file is committed to git.
     envVars:
+      - key: NODE_VERSION
+        value: 22            # Required: @supabase/supabase-js@2.110+ needs Node 22 for native WebSocket
       - key: NODE_ENV
         value: production
       - key: PORT
