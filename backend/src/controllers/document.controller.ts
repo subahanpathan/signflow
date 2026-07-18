@@ -202,7 +202,10 @@ export const shareDocument = async (req: AuthRequest, res: Response): Promise<vo
     // Extract unique emails
     const uniqueEmails = Array.from(new Set(fields.map(f => f.signerEmail.toLowerCase())));
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    let frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    if (!/^https?:\/\//i.test(frontendUrl)) {
+      frontendUrl = `https://${frontendUrl}`;
+    }
     const links: { email: string; link: string }[] = [];
 
     // For each email, find or create a token

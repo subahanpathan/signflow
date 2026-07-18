@@ -338,7 +338,17 @@ export const DocumentStudio: React.FC = () => {
     try {
       setSharing(true);
       const { data } = await api.post(`/docs/${id}/share`);
-      setSigningLinks(data.links);
+      
+      // Normalize links to use current window origin in case backend FRONTEND_URL is out of date or missing protocol
+      const normalizedLinks = data.links.map((linkData: { email: string; link: string }) => {
+        const token = linkData.link.substring(linkData.link.lastIndexOf('/') + 1);
+        return {
+          email: linkData.email,
+          link: `${window.location.origin}/sign/${token}`,
+        };
+      });
+      
+      setSigningLinks(normalizedLinks);
     } catch (err) {
       console.error('Failed to generate signing links:', err);
       alert('Failed to generate signing links. Please try again.');
