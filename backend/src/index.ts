@@ -48,12 +48,13 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // ── CORS — strict origin whitelist ────────────────────────────────────────────
-const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+const allowedOrigin = process.env.FRONTEND_URL || 'https://signflow-ten-phi.vercel.app';
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow same-origin requests (no Origin header) and the configured frontend URL
-      if (!origin || origin === allowedOrigin) {
+      // Allow same-origin requests and both production and local dev origins
+      const whitelist = [process.env.FRONTEND_URL, 'https://signflow-ten-phi.vercel.app'].filter(Boolean);
+      if (!origin || whitelist.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error(`CORS policy: origin ${origin} is not allowed`));

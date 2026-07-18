@@ -1,8 +1,8 @@
+// src/lib/axios.ts
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  withCredentials: true,
+  baseURL: `${import.meta.env.VITE_API_URL}/api`,
 });
 
 api.interceptors.response.use(
@@ -10,13 +10,12 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Do not intercept errors on public signing routes — they never use the
-    // owner's JWT, so a 401/network failure here must not clear the session.
+    // Do not intercept errors on public signing routes
     if (originalRequest?.url?.startsWith('/public/sign/')) {
       return Promise.reject(error);
     }
 
-    // Network / CORS failure (no response received) — do not log user out
+    // Network / CORS failure (no response received)
     if (!error.response) {
       return Promise.reject(error);
     }
@@ -24,11 +23,7 @@ api.interceptors.response.use(
     if (error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        const { data } = await axios.post(
-          `${import.meta.env.VITE_API_URL}/auth/refresh`,
-          {},
-          { withCredentials: true }
-        );
+        const { data } = await axios.post('/auth/refresh', {}, { withCredentials: true });
         api.defaults.headers.common['Authorization'] = `Bearer ${data.accessToken}`;
         originalRequest.headers['Authorization'] = `Bearer ${data.accessToken}`;
         return api(originalRequest);
