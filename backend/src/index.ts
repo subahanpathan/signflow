@@ -48,12 +48,12 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // ── CORS — strict origin whitelist ────────────────────────────────────────────
-const allowedOrigin = process.env.FRONTEND_URL || 'https://signflow-ten-phi.vercel.app';
+const allowedOrigin = process.env.FRONTEND_URL || 'https://signflow-olive-three.vercel.app';
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow same-origin requests and both production and local dev origins
-      const whitelist = [process.env.FRONTEND_URL, 'https://signflow-ten-phi.vercel.app'].filter(Boolean);
+      const whitelist = [process.env.FRONTEND_URL, 'https://signflow-olive-three.vercel.app'].filter(Boolean);
       if (!origin || whitelist.includes(origin)) {
         callback(null, true);
       } else {
